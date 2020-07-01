@@ -40,7 +40,6 @@ import com.shopify.testify.report.Reporter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.Description
 import java.io.File
@@ -56,7 +55,7 @@ internal open class ReporterTest {
     private val mockFile: File = mock()
     private val reporter = spy(Reporter(mockContext, mockSession, mockOutputFileUtility))
 
-//    @Before
+    @Before
     fun setup() {
         with(mockSession) {
             doReturn("SESSION-ID").whenever(this).sessionId
@@ -237,10 +236,8 @@ internal open class ReporterTest {
                 "        status: PASS\n", yaml)
     }
 
-    @Test
-    fun `reporter output for a multiples tests in a new session`() {
 
-        val session = spy(ReportSession())
+    private fun setUpForFirstTest(session: ReportSession): Reporter {
         val reporter = spy(Reporter(mockContext, session, mockOutputFileUtility))
 
         with(mockOutputFileUtility) {
@@ -274,25 +271,25 @@ internal open class ReporterTest {
         }
 
         doReturn(false).whenever(mockFile).exists()
+        return reporter
+    }
 
-        reporter.startTest(mockRule, mockDescription)
-        reporter.identifySession(mockInstrumentation)
-        reporter.captureOutput(mockRule)
-        reporter.pass()
-        reporter.endTest()
+    private fun setUpForSecondTest(): Reporter {
+        val session = spy(ReportSession())
+        val reporter = setUpForFirstTest(session)
 
         // Set up for second test
         doReturn(true).whenever(mockFile).exists()
         doReturn(true).whenever(session).isEqual(any())
 
         val BODY_LINES = listOf(
-            "  - test:",
-            "    name: startTest",
-            "    class: ReporterTest",
-            "    package: com.shopify.testify",
-            "    baseline_image: assets/foo",
-            "    test_image: bar",
-            "    status: PASS"
+            "    - test:",
+            "        name: passingTest",
+            "        class: ReporterTest",
+            "        package: com.shopify.testify",
+            "        baseline_image: assets/foo",
+            "        test_image: bar",
+            "        status: PASS"
         )
 
         doReturn(BODY_LINES).whenever(reporter).readBodyLines(mockFile)
@@ -314,12 +311,30 @@ internal open class ReporterTest {
             }.whenever(this).initFromFile(eq(mockFile))
         }
 
-        reporter.startTest(mockRule, mockDescription)
-        reporter.identifySession(mockInstrumentation)
-        reporter.captureOutput(mockRule)
         doReturn("failingTest").whenever(mockRule).testMethodName
-        reporter.fail(Exception("This is a failure"))
-        reporter.endTest()
+
+        return reporter
+    }
+
+    @Test
+    fun `reporter output for a multiples tests in a new session`() {
+
+        with(setUpForFirstTest(spy(ReportSession()))) {
+            this.startTest(mockRule, mockDescription)
+            this.identifySession(mockInstrumentation)
+            this.captureOutput(mockRule)
+            this.pass()
+            this.endTest()
+        }
+
+        val reporter = setUpForSecondTest()
+        with(reporter) {
+            this.startTest(mockRule, mockDescription)
+            this.identifySession(mockInstrumentation)
+            this.captureOutput(mockRule)
+            this.fail(Exception("This is a failure"))
+            this.endTest()
+        }
 
         val yaml = reporter.yaml
 
@@ -333,12 +348,22 @@ internal open class ReporterTest {
         assertEquals("- total: 2", lines[5])
         assertEquals("- tests:", lines[6])
         assertEquals("    - test:", lines[7])
-        assertEquals("        name: startTest", lines[8])
+        assertEquals("        name: failingTest", lines[8])
         assertEquals("        class: ReporterTest", lines[9])
         assertEquals("        package: com.shopify.testify", lines[10])
         assertEquals("        baseline_image: assets/foo", lines[11])
         assertEquals("        test_image: bar", lines[12])
-        assertEquals("        status: PASS", lines[13])
+        assertEquals("        status: FAIL", lines[13])
+        assertEquals("        cause: UNKNOWN", lines[14])
+        assertEquals("        description: \"This is a failure\"", lines[15])
+        assertEquals("    - test:", lines[16])
+        assertEquals("        name: passingTest", lines[17])
+        assertEquals("        class: ReporterTest", lines[18])
+        assertEquals("        package: com.shopify.testify", lines[19])
+        assertEquals("        baseline_image: assets/foo", lines[20])
+        assertEquals("        test_image: bar", lines[21])
+        assertEquals("        status: PASS", lines[22])
+
     }
 
     private val Reporter.yaml: String
