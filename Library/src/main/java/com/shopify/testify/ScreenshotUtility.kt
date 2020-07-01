@@ -31,15 +31,15 @@ import android.graphics.BitmapFactory
 import android.os.Debug
 import android.util.Log
 import android.view.View
-import androidx.test.platform.app.InstrumentationRegistry
 import com.shopify.testify.TestifyFeatures.CanvasCapture
 import com.shopify.testify.TestifyFeatures.PixelCopyCapture
 import com.shopify.testify.internal.DeviceIdentifier
-import com.shopify.testify.internal.DeviceIdentifier.DEFAULT_FOLDER_FORMAT
 import com.shopify.testify.internal.capture.createBitmapFromCanvas
 import com.shopify.testify.internal.capture.createBitmapFromDrawingCache
 import com.shopify.testify.internal.capture.createBitmapUsingPixelCopy
 import com.shopify.testify.internal.exception.ScreenshotDirectoryNotFoundException
+import com.shopify.testify.internal.output.OutputFileUtility
+import com.shopify.testify.internal.output.OutputFileUtility.Companion.PNG_EXTENSION
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -48,6 +48,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 internal class ScreenshotUtility {
+
+    private val outputFileUtility = OutputFileUtility()
 
     private val preferredBitmapOptions: BitmapFactory.Options
         get() {
@@ -68,35 +70,18 @@ internal class ScreenshotUtility {
             outputStream.close()
             return true
         } else {
-            throw ScreenshotDirectoryNotFoundException(useSdCard(), getOutputDirectoryPath(context).absolutePath)
+            throw ScreenshotDirectoryNotFoundException(outputFileUtility.useSdCard(), outputFileUtility.getOutputDirectoryPath(context).absolutePath)
         }
     }
 
     private fun assureScreenshotDirectory(context: Context): Boolean {
         var created = true
-        val outputDirectory = getOutputDirectoryPath(context)
+        val outputDirectory = outputFileUtility.getOutputDirectoryPath(context)
         if (!outputDirectory.exists()) {
             Log.d(LOG_TAG, "Trying to make the directory")
             created = outputDirectory.mkdirs()
         }
         return created
-    }
-
-    private fun getOutputDirectoryPath(context: Context): File {
-        val path: File
-        path = if (useSdCard()) {
-            val sdCard = context.getExternalFilesDir(null)
-            File("${sdCard?.absolutePath}/$SDCARD_DESTINATION_DIR")
-        } else {
-            context.getDir(DATA_DESTINATION_DIR, Context.MODE_PRIVATE)
-        }
-
-        val deviceFormattedDirectory = DeviceIdentifier.formatDeviceString(DeviceIdentifier.DeviceStringFormatter(context, null), DEFAULT_FOLDER_FORMAT)
-        return File(path, "$ROOT_DIR/$deviceFormattedDirectory")
-    }
-
-    fun getOutputFilePath(context: Context, fileName: String): String {
-        return "${getOutputDirectoryPath(context).path}/$fileName$PNG_EXTENSION"
     }
 
     @Throws(Exception::class)
@@ -127,7 +112,11 @@ internal class ScreenshotUtility {
      * Load a baseline bitmap from the androidTest assets directory.
      */
     fun loadBaselineBitmapForComparison(context: Context, testName: String): Bitmap? {
-        val filePath = "$ROOT_DIR/${DeviceIdentifier.getDescription(context)}/$testName$PNG_EXTENSION"
+        val filePath = outputFileUtility.getFileRelativeToRoot(
+            subpath = DeviceIdentifier.getDescription(context),
+            fileName = testName,
+            extension = PNG_EXTENSION
+        )
         return loadBitmapFromAsset(context, filePath)
     }
 
@@ -161,27 +150,17 @@ internal class ScreenshotUtility {
             return null
         }
 
-        val outputPath = getOutputFilePath(activity, fileName)
+        val outputPath = outputFileUtility.getOutputFilePath(activity, fileName)
         saveBitmapToFile(activity, currentActivityBitmap[0], outputPath)
         return BitmapFactory.decodeFile(outputPath, preferredBitmapOptions)
     }
 
     fun deleteBitmap(context: Context, fileName: String): Boolean {
-        val file = File(getOutputFilePath(context, fileName))
+        val file = File(outputFileUtility.getOutputFilePath(context, fileName))
         return file.delete()
     }
 
     companion object {
-
         private val LOG_TAG = ScreenshotUtility::class.java.simpleName
-        private const val PNG_EXTENSION = ".png"
-        private const val DATA_DESTINATION_DIR = "images"
-        private const val SDCARD_DESTINATION_DIR = "testify_images"
-        private const val ROOT_DIR = "screenshots"
-
-        fun useSdCard(): Boolean {
-            val extras = InstrumentationRegistry.getArguments()
-            return extras.containsKey("useSdCard") && extras.get("useSdCard") == "true"
-        }
     }
 }

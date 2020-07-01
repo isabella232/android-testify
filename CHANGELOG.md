@@ -1,5 +1,19 @@
 # Testify Change Log
 
+
+# TODO
+
+1. Fix reportShow output
+~2. Report.yml is not accumulating~
+3. Odd path output in plugin tasks
+~4. Write tests~
+5. changelog
+6. documentation
+7. make exception handling more explicit
+8. hook up skip logic to `evaluate`
+9. ReporterLifecycleTest
+10. OutputFilePathTest
+
 ## 1.0.0-beta5
 
 ### Library
