@@ -38,6 +38,7 @@ import com.shopify.testify.internal.output.OutputFileUtility
 import com.shopify.testify.report.ReportSession
 import com.shopify.testify.report.Reporter
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Ignore
 import org.junit.Test
@@ -55,7 +56,7 @@ internal open class ReporterTest {
     private val mockFile: File = mock()
     private val reporter = spy(Reporter(mockContext, mockSession, mockOutputFileUtility))
 
-    @Before
+//    @Before
     fun setup() {
         with(mockSession) {
             doReturn("SESSION-ID").whenever(this).sessionId
@@ -236,19 +237,83 @@ internal open class ReporterTest {
                 "        status: PASS\n", yaml)
     }
 
-    @Ignore // The fixtures are wrong for this test
     @Test
     fun `reporter output for a multiples tests in a new session`() {
-        setupMockFile()
+
+        val session = spy(ReportSession())
+        val reporter = spy(Reporter(mockContext, session, mockOutputFileUtility))
+
+        with(mockOutputFileUtility) {
+            doReturn(false).whenever(this).useSdCard()
+        }
+
+        with(mockContext) {
+            doReturn(File("foo")).whenever(this).getExternalFilesDir(any())
+            doReturn(File("/data/data/com.app.example/app_testify")).whenever(this).getDir(eq("testify"), any())
+            doReturn(File("/sdcard")).whenever(this).getExternalFilesDir(anyOrNull())
+        }
+
+        with(mockInstrumentation) {
+            doReturn(mockContext).whenever(this).context
+        }
+
+        with(mockRule) {
+            doReturn("startTest").whenever(this).testMethodName
+        }
+
+        with(mockDescription) {
+            doReturn(ReporterTest::class.java).whenever(this).testClass
+        }
+
+        with(reporter) {
+            doReturn("foo").whenever(this).getBaselinePath(any())
+            doReturn("bar").whenever(this).getOutputPath(any())
+            doReturn(mockFile).whenever(this).getReportFile()
+            doNothing().whenever(this).writeToFile(any(), any())
+            doNothing().whenever(this).clearFile(eq(mockFile))
+        }
 
         doReturn(false).whenever(mockFile).exists()
+
         reporter.startTest(mockRule, mockDescription)
         reporter.identifySession(mockInstrumentation)
         reporter.captureOutput(mockRule)
         reporter.pass()
         reporter.endTest()
 
+        // Set up for second test
         doReturn(true).whenever(mockFile).exists()
+        doReturn(true).whenever(session).isEqual(any())
+
+        val BODY_LINES = listOf(
+            "  - test:",
+            "    name: startTest",
+            "    class: ReporterTest",
+            "    package: com.shopify.testify",
+            "    baseline_image: assets/foo",
+            "    test_image: bar",
+            "    status: PASS"
+        )
+
+        doReturn(BODY_LINES).whenever(reporter).readBodyLines(mockFile)
+
+        with(session) {
+            doReturn(true).whenever(this).isEqual(eq(mockFile))
+            val lines = listOf(
+                "---",
+                "- session: 623815995-1",
+                "- date: 2020-06-26@14:49:45",
+                "- failed: 0",
+                "- passed: 1",
+                "- total: 1",
+                "- tests:"
+            ) + BODY_LINES
+
+            doAnswer {
+                this.initFromLines(lines)
+            }.whenever(this).initFromFile(eq(mockFile))
+        }
+
         reporter.startTest(mockRule, mockDescription)
         reporter.identifySession(mockInstrumentation)
         reporter.captureOutput(mockRule)
@@ -258,32 +323,22 @@ internal open class ReporterTest {
 
         val yaml = reporter.yaml
 
-        assertEquals(
-            "---\n" +
-                    "- session: SESSION-ID\n" +
-                    "- date: Today\n" +
-                    "- failed: 1\n" +
-                    "- passed: 2\n" +
-                    "- total: 3\n" +
-                    "- tests:\n" +
-                    "    - test:\n" +
-                    "        name: startTest\n" +
-                    "        class: ReporterTest\n" +
-                    "        package: com.shopify.testify\n" +
-                    "        baseline_image: assets/foo\n" +
-                    "        test_image: bar\n" +
-                    "        status: PASS\n" +
-                    "    - test:\n" +
-                    "        name: startTest\n" +
-                    "        class: ReporterTest\n" +
-                    "        package: com.shopify.testify\n" +
-                    "        baseline_image: assets/foo\n" +
-                    "        test_image: bar\n" +
-                    "        status: FAIL\n" +
-                    "        cause: UNKNOWN\n" +
-                    "        description: \"This is a failure\"",
-            yaml
-        )
+        val lines = yaml.lines()
+
+        assertEquals("---", lines[0])
+        assertTrue("- session: [0-9a-fA-F]{8}-[0-9]{1,3}".toRegex().containsMatchIn(lines[1]))
+        assertTrue("- date: [0-9]{4}-[0-9]{2}-[0-9]{2}@[0-9]{2}:[0-9]{2}:[0-9]{2}".toRegex().containsMatchIn(lines[2]))
+        assertEquals("- failed: 1", lines[3])
+        assertEquals("- passed: 1", lines[4])
+        assertEquals("- total: 2", lines[5])
+        assertEquals("- tests:", lines[6])
+        assertEquals("    - test:", lines[7])
+        assertEquals("        name: startTest", lines[8])
+        assertEquals("        class: ReporterTest", lines[9])
+        assertEquals("        package: com.shopify.testify", lines[10])
+        assertEquals("        baseline_image: assets/foo", lines[11])
+        assertEquals("        test_image: bar", lines[12])
+        assertEquals("        status: PASS", lines[13])
     }
 
     private val Reporter.yaml: String
