@@ -10,7 +10,7 @@
 5. changelog
 6. documentation
 7. make exception handling more explicit
-8. hook up skip logic to `evaluate`
+~8. hook up skip logic to `evaluate`~
 9. ReporterLifecycleTest
 10. OutputFilePathTest
 

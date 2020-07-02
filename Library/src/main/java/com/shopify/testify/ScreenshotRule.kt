@@ -379,7 +379,7 @@ open class ScreenshotRule<T : Activity> @JvmOverloads constructor(
 
         try {
             try {
-				reporter?.captureOutput(this)
+                reporter?.captureOutput(this)
 
                 if (isRunningOnUiThread()) {
                     throw NoScreenshotsOnUiThreadException()

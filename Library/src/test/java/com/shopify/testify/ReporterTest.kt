@@ -56,17 +56,18 @@ internal open class ReporterTest {
     private val reporter = spy(Reporter(mockContext, mockSession, mockOutputFileUtility))
 
     @Before
-    fun setup() {
+    fun prepareMocks() {
         with(mockSession) {
             doReturn("SESSION-ID").whenever(this).sessionId
             doReturn("Today").whenever(this).getTimestamp(any())
             doReturn(1).whenever(this).failCount
             doReturn(2).whenever(this).passCount
             doReturn(3).whenever(this).testCount
-        }
-
-        with(mockOutputFileUtility) {
-            doReturn(false).whenever(this).useSdCard()
+            doReturn(true).whenever(this).isEqual(eq(mockFile))
+            val lines = HEADER_LINES + BODY_LINES
+            doAnswer {
+                this.initFromLines(lines)
+            }.whenever(this).initFromFile(eq(mockFile))
         }
 
         with(mockContext) {
@@ -78,38 +79,17 @@ internal open class ReporterTest {
         with(reporter) {
             doReturn("foo").whenever(this).getBaselinePath(any())
             doReturn("bar").whenever(this).getOutputPath(any())
-        }
-
-        with(mockInstrumentation) {
-            doReturn(mockContext).whenever(this).context
-        }
-
-        with(mockRule) {
-            doReturn("startTest").whenever(this).testMethodName
-        }
-
-        with(mockDescription) {
-            doReturn(ReporterTest::class.java).whenever(this).testClass
-        }
-    }
-
-    private fun setupMockFile() {
-        doReturn(true).whenever(mockFile).exists()
-
-        with(reporter) {
             doReturn(mockFile).whenever(this).getReportFile()
             doNothing().whenever(this).writeToFile(any(), any())
             doNothing().whenever(this).clearFile(eq(mockFile))
             doReturn(BODY_LINES).whenever(this).readBodyLines(mockFile)
         }
 
-        with(mockSession) {
-            doReturn(true).whenever(this).isEqual(eq(mockFile))
-            val lines = HEADER_LINES + BODY_LINES
-            doAnswer {
-                this.initFromLines(lines)
-            }.whenever(this).initFromFile(eq(mockFile))
-        }
+        doReturn(false).whenever(mockOutputFileUtility).useSdCard()
+        doReturn(mockContext).whenever(mockInstrumentation).context
+        doReturn("startTest").whenever(mockRule).testMethodName
+        doReturn(ReporterTest::class.java).whenever(mockDescription).testClass
+        doReturn(true).whenever(mockFile).exists()
     }
 
     @Test
@@ -160,7 +140,6 @@ internal open class ReporterTest {
 
     @Test
     fun `endTest() produces the expected yaml for a new session`() {
-        setupMockFile()
         doReturn(false).whenever(mockFile).exists()
 
         reporter.endTest()
@@ -170,7 +149,6 @@ internal open class ReporterTest {
 
     @Test
     fun `endTest() produces the expected yaml for an existing session`() {
-        setupMockFile()
 
         reporter.endTest()
 
@@ -186,7 +164,6 @@ internal open class ReporterTest {
 
     @Test
     fun `endTest() produces the expected yaml for when overwriting a different session`() {
-        setupMockFile()
         doReturn(false).whenever(mockSession).isEqual(eq(mockFile))
 
         reporter.endTest()
@@ -196,12 +173,14 @@ internal open class ReporterTest {
 
     @Test
     fun `output file path when not using sdcard`() {
+        val reporter = Reporter(mockContext, mockSession, mockOutputFileUtility)
         val file = reporter.getReportFile()
         assertEquals("/data/data/com.app.example/app_testify/report.yml", file.path)
     }
 
     @Test
     fun `output file path when using sdcard`() {
+        val reporter = Reporter(mockContext, mockSession, mockOutputFileUtility)
         doReturn(true).whenever(mockOutputFileUtility).useSdCard()
         val file = reporter.getReportFile()
         assertEquals("/sdcard/testify/report.yml", file.path)
@@ -209,7 +188,6 @@ internal open class ReporterTest {
 
     @Test
     fun `reporter output for a single test in a new session`() {
-        setupMockFile()
         doReturn(false).whenever(mockFile).exists()
 
         reporter.startTest(mockRule, mockDescription)
@@ -236,86 +214,6 @@ internal open class ReporterTest {
                 "        status: PASS\n", yaml)
     }
 
-
-    private fun setUpForFirstTest(session: ReportSession): Reporter {
-        val reporter = spy(Reporter(mockContext, session, mockOutputFileUtility))
-
-        with(mockOutputFileUtility) {
-            doReturn(false).whenever(this).useSdCard()
-        }
-
-        with(mockContext) {
-            doReturn(File("foo")).whenever(this).getExternalFilesDir(any())
-            doReturn(File("/data/data/com.app.example/app_testify")).whenever(this).getDir(eq("testify"), any())
-            doReturn(File("/sdcard")).whenever(this).getExternalFilesDir(anyOrNull())
-        }
-
-        with(mockInstrumentation) {
-            doReturn(mockContext).whenever(this).context
-        }
-
-        with(mockRule) {
-            doReturn("startTest").whenever(this).testMethodName
-        }
-
-        with(mockDescription) {
-            doReturn(ReporterTest::class.java).whenever(this).testClass
-        }
-
-        with(reporter) {
-            doReturn("foo").whenever(this).getBaselinePath(any())
-            doReturn("bar").whenever(this).getOutputPath(any())
-            doReturn(mockFile).whenever(this).getReportFile()
-            doNothing().whenever(this).writeToFile(any(), any())
-            doNothing().whenever(this).clearFile(eq(mockFile))
-        }
-
-        doReturn(false).whenever(mockFile).exists()
-        return reporter
-    }
-
-    private fun setUpForSecondTest(): Reporter {
-        val session = spy(ReportSession())
-        val reporter = setUpForFirstTest(session)
-
-        // Set up for second test
-        doReturn(true).whenever(mockFile).exists()
-        doReturn(true).whenever(session).isEqual(any())
-
-        val BODY_LINES = listOf(
-            "    - test:",
-            "        name: passingTest",
-            "        class: ReporterTest",
-            "        package: com.shopify.testify",
-            "        baseline_image: assets/foo",
-            "        test_image: bar",
-            "        status: PASS"
-        )
-
-        doReturn(BODY_LINES).whenever(reporter).readBodyLines(mockFile)
-
-        with(session) {
-            doReturn(true).whenever(this).isEqual(eq(mockFile))
-            val lines = listOf(
-                "---",
-                "- session: 623815995-1",
-                "- date: 2020-06-26@14:49:45",
-                "- failed: 0",
-                "- passed: 1",
-                "- total: 1",
-                "- tests:"
-            ) + BODY_LINES
-
-            doAnswer {
-                this.initFromLines(lines)
-            }.whenever(this).initFromFile(eq(mockFile))
-        }
-
-        doReturn("failingTest").whenever(mockRule).testMethodName
-
-        return reporter
-    }
-
     @Test
     fun `reporter output for a multiples tests in a new session`() {
 
@@ -336,10 +234,7 @@ internal open class ReporterTest {
             this.endTest()
         }
 
-        val yaml = reporter.yaml
-
-        val lines = yaml.lines()
-
+        val lines = reporter.yaml.lines()
         assertEquals("---", lines[0])
         assertTrue("- session: [0-9a-fA-F]{8}-[0-9]{1,3}".toRegex().containsMatchIn(lines[1]))
         assertTrue("- date: [0-9]{4}-[0-9]{2}-[0-9]{2}@[0-9]{2}:[0-9]{2}:[0-9]{2}".toRegex().containsMatchIn(lines[2]))
@@ -363,13 +258,64 @@ internal open class ReporterTest {
         assertEquals("        baseline_image: assets/foo", lines[20])
         assertEquals("        test_image: bar", lines[21])
         assertEquals("        status: PASS", lines[22])
-
     }
 
     private val Reporter.yaml: String
         get() {
             return this.builder.toString()
         }
+
+    private fun setUpForFirstTest(session: ReportSession): Reporter {
+        val reporter = spy(Reporter(mockContext, session, mockOutputFileUtility))
+
+        with(reporter) {
+            doReturn("foo").whenever(this).getBaselinePath(any())
+            doReturn("bar").whenever(this).getOutputPath(any())
+            doReturn(mockFile).whenever(this).getReportFile()
+            doNothing().whenever(this).writeToFile(any(), any())
+            doNothing().whenever(this).clearFile(eq(mockFile))
+        }
+
+        doReturn(false).whenever(mockFile).exists()
+        return reporter
+    }
+
+    private fun setUpForSecondTest(): Reporter {
+        val session = spy(ReportSession())
+        val reporter = setUpForFirstTest(session)
+        val bodyLines = listOf(
+            "    - test:",
+            "        name: passingTest",
+            "        class: ReporterTest",
+            "        package: com.shopify.testify",
+            "        baseline_image: assets/foo",
+            "        test_image: bar",
+            "        status: PASS"
+        )
+
+        doReturn(true).whenever(mockFile).exists()
+        doReturn(true).whenever(session).isEqual(any())
+        doReturn(bodyLines).whenever(reporter).readBodyLines(mockFile)
+        doReturn("failingTest").whenever(mockRule).testMethodName
+
+        with(session) {
+            doReturn(true).whenever(this).isEqual(eq(mockFile))
+            val lines = listOf(
+                "---",
+                "- session: 623815995-1",
+                "- date: 2020-06-26@14:49:45",
+                "- failed: 0",
+                "- passed: 1",
+                "- total: 1",
+                "- tests:"
+            ) + bodyLines
+
+            doAnswer {
+                this.initFromLines(lines)
+            }.whenever(this).initFromFile(eq(mockFile))
+        }
+        return reporter
+    }
 
     companion object {
         private const val FILE_HEADER = "---\n" +
