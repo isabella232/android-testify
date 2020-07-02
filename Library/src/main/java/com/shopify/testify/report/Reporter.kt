@@ -25,7 +25,9 @@ package com.shopify.testify.report
 
 import android.app.Instrumentation
 import android.content.Context
+import android.os.Bundle
 import androidx.annotation.VisibleForTesting
+import androidx.test.platform.app.InstrumentationRegistry
 import com.shopify.testify.ScreenshotRule
 import com.shopify.testify.internal.DeviceIdentifier
 import com.shopify.testify.internal.output.OutputFileUtility
@@ -132,8 +134,12 @@ internal open class Reporter(
         return outputFileUtility.getOutputFilePath(context, rule.fileName)
     }
 
+    @VisibleForTesting internal open fun getEnvironmentArguments(): Bundle {
+        return InstrumentationRegistry.getArguments()
+    }
+
     @VisibleForTesting internal open fun getReportFile(): File {
-        val path = if (outputFileUtility.useSdCard()) {
+        val path = if (outputFileUtility.useSdCard(getEnvironmentArguments())) {
             val sdCard = context.getExternalFilesDir(null)
             File(sdCard, "testify")
         } else {

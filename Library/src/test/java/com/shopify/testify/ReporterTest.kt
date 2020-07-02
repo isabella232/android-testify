@@ -25,6 +25,7 @@ package com.shopify.testify
 
 import android.app.Instrumentation
 import android.content.Context
+import android.os.Bundle
 import com.nhaarman.mockitokotlin2.any
 import com.nhaarman.mockitokotlin2.anyOrNull
 import com.nhaarman.mockitokotlin2.doAnswer
@@ -85,7 +86,7 @@ internal open class ReporterTest {
             doReturn(BODY_LINES).whenever(this).readBodyLines(mockFile)
         }
 
-        doReturn(false).whenever(mockOutputFileUtility).useSdCard()
+        doReturn(false).whenever(mockOutputFileUtility).useSdCard(any())
         doReturn(mockContext).whenever(mockInstrumentation).context
         doReturn("startTest").whenever(mockRule).testMethodName
         doReturn(ReporterTest::class.java).whenever(mockDescription).testClass
@@ -173,15 +174,17 @@ internal open class ReporterTest {
 
     @Test
     fun `output file path when not using sdcard`() {
-        val reporter = Reporter(mockContext, mockSession, mockOutputFileUtility)
+        val reporter = spy(Reporter(mockContext, mockSession, mockOutputFileUtility))
+        doReturn(mock<Bundle>()).whenever(reporter).getEnvironmentArguments()
         val file = reporter.getReportFile()
         assertEquals("/data/data/com.app.example/app_testify/report.yml", file.path)
     }
 
     @Test
     fun `output file path when using sdcard`() {
-        val reporter = Reporter(mockContext, mockSession, mockOutputFileUtility)
-        doReturn(true).whenever(mockOutputFileUtility).useSdCard()
+        val reporter = spy(Reporter(mockContext, mockSession, mockOutputFileUtility))
+        doReturn(mock<Bundle>()).whenever(reporter).getEnvironmentArguments()
+        doReturn(true).whenever(mockOutputFileUtility).useSdCard(any())
         val file = reporter.getReportFile()
         assertEquals("/sdcard/testify/report.yml", file.path)
     }

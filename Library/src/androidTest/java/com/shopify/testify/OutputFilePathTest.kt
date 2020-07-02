@@ -23,27 +23,43 @@
  */
 package com.shopify.testify
 
+import android.os.Bundle
+import androidx.test.platform.app.InstrumentationRegistry
+import com.shopify.testify.internal.output.OutputFileUtility
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OutputFilePathTest {
 
     @Test
     fun useSdCard() {
+        val subject = OutputFileUtility()
+        assertFalse(subject.useSdCard(Bundle.EMPTY))
+        assertTrue(subject.useSdCard(Bundle().apply {
+            putString("useSdCard", "true")
+        }))
     }
 
     @Test
     fun getFileRelativeToRoot() {
-    }
-
-    @Test
-    fun getPathRelativeToRoot() {
+        val subject = OutputFileUtility()
+        val value = subject.getFileRelativeToRoot("foo", "bar", ".ext")
+        assertEquals("screenshots/foo/bar.ext", value)
     }
 
     @Test
     fun getOutputDirectoryPath() {
+        val subject = OutputFileUtility()
+        val value = subject.getOutputDirectoryPath(InstrumentationRegistry.getInstrumentation().targetContext)
+        assertEquals("/data/user/0/com.shopify.testify.test/app_images/screenshots/29-1080x1920@441dp-en_US", value.path)
     }
 
     @Test
     fun getOutputFilePath() {
+        val subject = OutputFileUtility()
+        val value = subject.getOutputFilePath(InstrumentationRegistry.getInstrumentation().targetContext, "foo")
+        assertEquals("/data/user/0/com.shopify.testify.test/app_images/screenshots/29-1080x1920@441dp-en_US/foo.png", value)
     }
 }

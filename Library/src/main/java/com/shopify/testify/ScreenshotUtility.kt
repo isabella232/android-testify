@@ -31,6 +31,7 @@ import android.graphics.BitmapFactory
 import android.os.Debug
 import android.util.Log
 import android.view.View
+import androidx.test.platform.app.InstrumentationRegistry
 import com.shopify.testify.TestifyFeatures.CanvasCapture
 import com.shopify.testify.TestifyFeatures.PixelCopyCapture
 import com.shopify.testify.internal.DeviceIdentifier
@@ -70,7 +71,7 @@ internal class ScreenshotUtility {
             outputStream.close()
             return true
         } else {
-            throw ScreenshotDirectoryNotFoundException(outputFileUtility.useSdCard(), outputFileUtility.getOutputDirectoryPath(context).absolutePath)
+            throw ScreenshotDirectoryNotFoundException(outputFileUtility.useSdCard(InstrumentationRegistry.getArguments()), outputFileUtility.getOutputDirectoryPath(context).absolutePath)
         }
     }
 

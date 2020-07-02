@@ -24,6 +24,7 @@
 package com.shopify.testify.internal.output
 
 import android.content.Context
+import android.os.Bundle
 import androidx.test.platform.app.InstrumentationRegistry
 import com.shopify.testify.internal.DeviceIdentifier
 import java.io.File
@@ -37,9 +38,8 @@ internal open class OutputFileUtility {
         internal const val PNG_EXTENSION = ".png"
     }
 
-    internal open fun useSdCard(): Boolean {
-        val extras = InstrumentationRegistry.getArguments()
-        return extras.containsKey("useSdCard") && extras.get("useSdCard") == "true"
+    internal open fun useSdCard(arguments: Bundle): Boolean {
+        return arguments.containsKey("useSdCard") && arguments.get("useSdCard") == "true"
     }
 
     internal fun getFileRelativeToRoot(subpath: String, fileName: String, extension: String): String {
@@ -52,7 +52,7 @@ internal open class OutputFileUtility {
 
     internal fun getOutputDirectoryPath(context: Context): File {
         val path: File
-        path = if (useSdCard()) {
+        path = if (useSdCard(InstrumentationRegistry.getArguments())) {
             val sdCard = context.getExternalFilesDir(null)
             File("${sdCard?.absolutePath}/$SDCARD_DESTINATION_DIR")
         } else {
